@@ -72,6 +72,7 @@ class SimpleSeq2Seq(Model):
     def __init__(self,
                  vocab: Vocabulary,
                  source_embedder: TextFieldEmbedder,
+                 label_embedder: TextFieldEmbedder,
                  encoder: Seq2SeqEncoder,
                  max_decoding_steps: int,
                  attention: Attention = None,
@@ -103,6 +104,9 @@ class SimpleSeq2Seq(Model):
 
         # Dense embedding of source vocab tokens.
         self._source_embedder = source_embedder
+
+        # Dense embedding of label vocab tokens.
+        self._label_embedder = label_embedder
 
         # Encodes the sequence of source embeddings into a sequence of hidden states.
         self._encoder = encoder
@@ -191,7 +195,8 @@ class SimpleSeq2Seq(Model):
     @overrides
     def forward(self,  # type: ignore
                 source_tokens: Dict[str, torch.LongTensor],
-                target_tokens: Dict[str, torch.LongTensor] = None) -> Dict[str, torch.Tensor]:
+                target_tokens: Dict[str, torch.LongTensor] = None,
+                labels: Dict[str, torch.LongTensor] = None) -> Dict[str, torch.Tensor]:
         # pylint: disable=arguments-differ
         """
         Make foward pass with decoder logic for producing the entire target sequence.
@@ -204,12 +209,18 @@ class SimpleSeq2Seq(Model):
         target_tokens : ``Dict[str, torch.LongTensor]``, optional (default = None)
            Output of `Textfield.as_array()` applied on target `TextField`. We assume that the
            target tokens are also represented as a `TextField`.
+        labels: ``Dict[str, torch.LongTensor]``
+           The output of `TextField.as_array()` applied on the label `TextField`. This will be
+           passed through a `TextFieldEmbedder`.
 
         Returns
         -------
         Dict[str, torch.Tensor]
         """
         state = self._encode(source_tokens)
+
+        if labels:
+            encoded_labels = self._label_embedder(labels)
 
         if target_tokens:
             state = self._init_decoder_state(state)
